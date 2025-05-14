@@ -54,6 +54,11 @@ public class JoueurIA implements IJoueur {
             // Attendre un court délai pour simuler la "réflexion"
             Thread.sleep(500);
             
+            // Vérifier si la partie est terminée
+            if (jeu.estPartieTerminee()) {
+                return null;
+            }
+            
             // Trouver le meilleur coup selon notre stratégie simple
             return trouverMeilleurCoup();
         } catch (InterruptedException e) {
@@ -184,11 +189,21 @@ public class JoueurIA implements IJoueur {
 
     @Override
     public void notifierTour() {
+        // Vérifier immédiatement si la partie est terminée
+        if (jeu.estPartieTerminee()) {
+            return; // Ne rien faire si la partie est terminée
+        }
+        
         // Exécuter l'IA dans un thread séparé pour ne pas bloquer l'interface
         executorService.submit(() -> {
             try {
                 // Petit délai pour que l'interface ait le temps de se mettre à jour
                 Thread.sleep(200);
+                
+                // Vérifier à nouveau si la partie est terminée (au cas où elle a changé pendant le délai)
+                if (jeu.estPartieTerminee()) {
+                    return;
+                }
                 
                 Coup coup = getCoup();
                 if (coup != null) {

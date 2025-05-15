@@ -36,6 +36,7 @@ public class Controlleur implements Observer {
     // Constantes pour les événements
     public static final String PROP_IA_THINKING = "ia_thinking";
     public static final String PROP_GAME_STATE = "game_state";
+    public static final String PROP_GAME_OVER = "game_over";
 
     /**
      * Constructeur - initialise le jeu et la vue
@@ -100,6 +101,9 @@ public class Controlleur implements Observer {
         // Démarrer la partie
         jeu.demarrerPartie();
         
+        // Signaler que la partie n'est pas terminée
+        firePropertyChange(PROP_GAME_OVER, true, false);
+        
         // Si l'IA commence, verrouiller l'interface
         if (jeu.joueurActuelEstIA()) {
             verrouillerInterface(true);
@@ -144,18 +148,19 @@ public class Controlleur implements Observer {
                 if (jeu.isPromotionEnCours()) {
                     PieceType choix = vue.demanderPromotion();
                     jeu.promouvoirPion(choix);
-                    
-                    // Vérifier si la partie est terminée après la promotion
-                    if (jeu.estPartieTerminee()) {
-                        afficherFinPartie();
-                    }
-                } 
-                // Vérifier si la partie est terminée
-                else if (jeu.estPartieTerminee()) {
-                    afficherFinPartie();
                 }
                 
-                // Si c'est maintenant le tour de l'IA
+                // Vérifier si la partie est terminée
+                if (jeu.estPartieTerminee()) {
+                    // Fin de la partie
+                    afficherFinPartie();
+                    // Déverrouiller l'interface et notifier que la partie est terminée
+                    verrouillerInterface(false);
+                    firePropertyChange(PROP_GAME_OVER, false, true);
+                    return true;
+                } 
+                
+                // Si c'est maintenant le tour de l'IA et que la partie n'est pas terminée
                 if (jeu.joueurActuelEstIA()) {
                     verrouillerInterface(true);
                     firePropertyChange(PROP_IA_THINKING, false, true);
@@ -172,14 +177,25 @@ public class Controlleur implements Observer {
      */
     @Override
     public void update(Observable o, Object arg) {
-        // Si c'est maintenant le tour du joueur humain (après un coup de l'IA)
+        // Vérifier d'abord si la partie est terminée
+        if (jeu.estPartieTerminee()) {
+            // Déverrouiller l'interface et notifier la fin de partie
+            SwingUtilities.invokeLater(() -> {
+                verrouillerInterface(false);
+                firePropertyChange(PROP_IA_THINKING, true, false);
+                firePropertyChange(PROP_GAME_OVER, false, true);
+                afficherFinPartie();
+            });
+            return;
+        }
+        
+        // Gérer le tour de jeu normal
         if (!jeu.joueurActuelEstIA() && interfaceVerrouillee) {
             SwingUtilities.invokeLater(() -> {
                 verrouillerInterface(false);
                 firePropertyChange(PROP_IA_THINKING, true, false);
             });
         }
-        // Si c'est le tour de l'IA et que l'interface n'est pas verrouillée
         else if (jeu.joueurActuelEstIA() && !interfaceVerrouillee) {
             SwingUtilities.invokeLater(() -> {
                 verrouillerInterface(true);
@@ -271,6 +287,10 @@ public class Controlleur implements Observer {
      * Affiche le message de fin de partie
      */
     public void afficherFinPartie() {
+        if (!jeu.estPartieTerminee()) {
+            return; // Ne rien faire si la partie n'est pas terminée
+        }
+        
         PieceColor vainqueur = jeu.getVainqueur();
         String message;
 
@@ -281,9 +301,11 @@ public class Controlleur implements Observer {
             message = "PAT ! La partie est nulle.";
         }
 
-        JOptionPane.showMessageDialog(vue, 
-            message, 
-            "Fin de partie", 
-            JOptionPane.INFORMATION_MESSAGE);
+        SwingUtilities.invokeLater(() -> 
+            JOptionPane.showMessageDialog(vue, 
+                message, 
+                "Fin de partie", 
+                JOptionPane.INFORMATION_MESSAGE)
+        );
     }
 }
